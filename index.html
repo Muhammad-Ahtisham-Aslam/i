@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T20 World Cup Tournament Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card-bg { background-color: #1e293b; border: 1px solid #334155; }
+        .input-box { background-color: #0f172a; border: 1px solid #475569; color: #fff; }
+        .flag-img { width: 24px; height: 16px; object-fit: cover; border-radius: 2px; display: inline-block; }
+    </style>
+</head>
+<body class="p-2 sm:p-6">
+
+    <!-- Header -->
+    <header class="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row justify-between items-center gap-4 card-bg p-4 rounded-xl shadow-lg">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-3 rounded-lg text-white">
+                <i class="fa-solid fa-trophy text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold tracking-wide">T20 WORLD CUP MANAGER</h1>
+                <p class="text-xs text-slate-400">Balanced Round-by-Round Schedule & Auto Points Table</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button onclick="exportData()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm px-3 py-2 rounded-lg font-medium transition flex items-center gap-1">
+                <i class="fa-solid fa-download"></i> Export Data
+            </button>
+            <label class="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-3 py-2 rounded-lg font-medium cursor-pointer transition flex items-center gap-1">
+                <i class="fa-solid fa-upload"></i> Import Data
+                <input type="file" id="importFile" onchange="importData(event)" class="hidden" accept=".json">
+            </label>
+            <button onclick="resetTournament()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm px-3 py-2 rounded-lg font-medium transition flex items-center gap-1">
+                <i class="fa-solid fa-rotate-right"></i> Reset All
+            </button>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="max-w-7xl mx-auto space-y-8">
+
+        <!-- Navigation Tabs -->
+        <div class="flex border-b border-slate-700 overflow-x-auto text-sm font-medium">
+            <button onclick="switchTab('groups')" id="tab-groups" class="py-3 px-6 text-blue-400 border-b-2 border-blue-500 whitespace-nowrap font-bold">1. Group Stage</button>
+            <button onclick="switchTab('super6')" id="tab-super6" class="py-3 px-6 text-slate-400 hover:text-slate-200 whitespace-nowrap">2. Super 6 Stage</button>
+            <button onclick="switchTab('knockouts')" id="tab-knockouts" class="py-3 px-6 text-slate-400 hover:text-slate-200 whitespace-nowrap">3. Knockouts (SF & Final)</button>
+        </div>
+
+        <!-- SECTION 1: GROUP STAGE -->
+        <section id="section-groups" class="space-y-8">
+            <div id="group-tables-container" class="grid grid-cols-1 lg:grid-cols-3 gap-6"></div>
+            <div class="space-y-4">
+                <h2 class="text-xl font-bold text-blue-400 border-b border-slate-700 pb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-calendar-days"></i> Group Stage Matches (Round-by-Round)
+                </h2>
+                <div id="group-fixtures-container" class="space-y-6"></div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: SUPER 6 -->
+        <section id="section-super6" class="space-y-8 hidden">
+            <div class="card-bg p-4 rounded-xl overflow-x-auto">
+                <h2 class="text-lg font-bold text-amber-400 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-star"></i> Super 6 Points Table
+                </h2>
+                <div id="super6-table-container"></div>
+            </div>
+            <div class="space-y-4">
+                <h2 class="text-xl font-bold text-amber-400 border-b border-slate-700 pb-2">Super 6 Fixtures (Balanced)</h2>
+                <div id="super6-fixtures-container" class="space-y-6"></div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: KNOCKOUTS -->
+        <section id="section-knockouts" class="space-y-8 hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Semi Final 1 -->
+                <div class="card-bg p-5 rounded-xl space-y-4">
+                    <h3 class="text-md font-bold text-blue-400 border-b border-slate-700 pb-2">Semi Final 1 (1st vs 4th)</h3>
+                    <div id="sf1-match-container"></div>
+                </div>
+                <!-- Semi Final 2 -->
+                <div class="card-bg p-5 rounded-xl space-y-4">
+                    <h3 class="text-md font-bold text-blue-400 border-b border-slate-700 pb-2">Semi Final 2 (2nd vs 3rd)</h3>
+                    <div id="sf2-match-container"></div>
+                </div>
+            </div>
+            <!-- Final -->
+            <div class="card-bg p-5 rounded-xl space-y-4 max-w-2xl mx-auto border-2 border-amber-500/50">
+                <h3 class="text-lg font-bold text-amber-400 text-center border-b border-slate-700 pb-2">🏆 THE FINAL</h3>
+                <div id="final-match-container"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const FLAGS = {
+            "India": "in", "Pakistan": "pk", "Sri Lanka": "lk", "Zimbabwe": "zw", "Netherlands": "nl", "Nepal": "np",
+            "Australia": "au", "England": "gb-eng", "Afghanistan": "af", "Ireland": "ie", "UAE": "ae", "Hong Kong": "hk",
+            "New Zealand": "nz", "South Africa": "za", "West Indies": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRaQKA3jEGlw4CJ-hkJ6Ch4wz-DjqII3t9zy_SwYxV-c0ZRc_-UKAmMLvY&s=10",
+            "Bangladesh": "bd", "Scotland": "gb-sct", "Oman": "om"
+        };
+
+        const INITIAL_GROUPS = {
+            "Group A": ["India", "Pakistan", "Sri Lanka", "Zimbabwe", "Netherlands", "Nepal"],
+            "Group B": ["Australia", "England", "Afghanistan", "Ireland", "UAE", "Hong Kong"],
+            "Group C": ["New Zealand", "South Africa", "West Indies", "Bangladesh", "Scotland", "Oman"]
+        };
+
+        let db;
+        let tournamentData = {
+            groupMatches: [],
+            super6Matches: [],
+            sf1: null,
+            sf2: null,
+            finalMatch: null
+        };
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open("T20WorldCupDB", 3);
+                request.onupgradeneeded = (e) => {
+                    db = e.target.result;
+                    if (!db.objectStoreNames.contains("tournament")) {
+                        db.createObjectStore("tournament", { keyPath: "id" });
+                    }
+                };
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    resolve();
+                };
+                request.onerror = (e) => reject(e);
+            });
+        }
+
+        async function saveData() {
+            localStorage.setItem("t20_wc_data_v3", JSON.stringify(tournamentData));
+            if (db) {
+                const tx = db.transaction("tournament", "readwrite");
+                const store = tx.objectStore("tournament");
+                store.put({ id: "main", data: tournamentData });
+            }
+        }
+
+        async function loadData() {
+            const local = localStorage.getItem("t20_wc_data_v3");
+            if (local) {
+                tournamentData = JSON.parse(local);
+            } else {
+                generateInitialFixtures();
+                await saveData();
+            }
+        }
+
+        function getFlagUrl(teamName) {
+            const code = FLAGS[teamName] || "un";
+            if (code.startsWith("http")) return code;
+            return `https://flagcdn.com/w40/${code}.png`;
+        }
+
+        function generateRoundRobinRounds(teams) {
+            let list = [...teams];
+            if (list.length % 2 !== 0) list.push(null);
+            const numTeams = list.length;
+            const roundsCount = numTeams - 1;
+            const half = numTeams / 2;
+            let rounds = [];
+
+            for (let r = 0; r < roundsCount; r++) {
+                let roundMatches = [];
+                for (let i = 0; i < half; i++) {
+                    let t1 = list[i];
+                    let t2 = list[numTeams - 1 - i];
+                    if (t1 !== null && t2 !== null) {
+                        roundMatches.push({ team1: t1, team2: t2 });
+                    }
+                }
+                rounds.push(roundMatches);
+                list.splice(1, 0, list.pop());
+            }
+            return rounds;
+        }
+
+        function generateInitialFixtures() {
+            tournamentData.groupMatches = [];
+
+            let groupRounds = {};
+            for (const [gName, teams] of Object.entries(INITIAL_GROUPS)) {
+                groupRounds[gName] = generateRoundRobinRounds(teams);
+            }
+
+            for (let r = 0; r < 5; r++) {
+                for (const gName of ["Group A", "Group B", "Group C"]) {
+                    let matches = groupRounds[gName][r] || [];
+                    matches.forEach((m, idx) => {
+                        tournamentData.groupMatches.push({
+                            id: `G_${gName}_R${r+1}_${idx}`,
+                            round: r + 1,
+                            group: gName,
+                            team1: m.team1,
+                            team2: m.team2,
+                            t1Score: null, t1Overs: null,
+                            t2Score: null, t2Overs: null,
+                            played: false
+                        });
+                    });
+                }
+            }
+        }
+
+        function calculateTable(teamsList, matches) {
+            let table = {};
+            teamsList.forEach(t => {
+                table[t] = { team: t, played: 0, won: 0, lost: 0, tie: 0, pts: 0, runsScored: 0, oversFaced: 0, runsConceded: 0, oversBowled: 0, nrr: 0 };
+            });
+
+            matches.forEach(m => {
+                if (!m.played || !table[m.team1] || !table[m.team2]) return;
+
+                let t1 = table[m.team1];
+                let t2 = table[m.team2];
+
+                t1.played++; t2.played++;
+                t1.runsScored += m.t1Score; t1.oversFaced += m.t1Overs;
+                t1.runsConceded += m.t2Score; t1.oversBowled += m.t2Overs;
+
+                t2.runsScored += m.t2Score; t2.oversFaced += m.t2Overs;
+                t2.runsConceded += m.t1Score; t2.oversBowled += m.t1Overs;
+
+                if (m.t1Score > m.t2Score) {
+                    t1.won++; t1.pts += 2; t2.lost++;
+                } else if (m.t2Score > m.t1Score) {
+                    t2.won++; t2.pts += 2; t1.lost++;
+                } else {
+                    t1.tie++; t2.tie++; t1.pts += 1; t2.pts += 1;
+                }
+            });
+
+            Object.values(table).forEach(t => {
+                let rRFor = t.oversFaced > 0 ? (t.runsScored / t.oversFaced) : 0;
+                let rRAgainst = t.oversBowled > 0 ? (t.runsConceded / t.oversBowled) : 0;
+                t.nrr = (rRFor - rRAgainst).toFixed(3);
+            });
+
+            return Object.values(table).sort((a, b) => b.pts - a.pts || b.nrr - a.nrr);
+        }
+
+        function renderApp() {
+            renderGroupStage();
+            checkAndGenerateSuper6();
+            renderSuper6();
+            checkAndGenerateKnockouts();
+            renderKnockouts();
+        }
+
+        function renderGroupStage() {
+            const tablesContainer = document.getElementById("group-tables-container");
+            const fixturesContainer = document.getElementById("group-fixtures-container");
+            tablesContainer.innerHTML = "";
+            fixturesContainer.innerHTML = "";
+
+            for (const [groupName, teams] of Object.entries(INITIAL_GROUPS)) {
+                const groupMatches = tournamentData.groupMatches.filter(m => m.group === groupName);
+                const tableData = calculateTable(teams, groupMatches);
+
+                let tableHTML = `
+                    <div class="card-bg p-4 rounded-xl overflow-x-auto shadow">
+                        <h3 class="font-bold text-blue-400 border-b border-slate-700 pb-2 mb-3 flex justify-between items-center">
+                            <span>${groupName}</span>
+                            <span class="text-xs text-slate-400">Top 2 Qualify</span>
+                        </h3>
+                        <table class="w-full text-xs text-left">
+                            <thead class="text-slate-400 uppercase bg-slate-800/50">
+                                <tr><th class="p-2">Team</th><th class="p-2">P</th><th class="p-2">W</th><th class="p-2">Pts</th><th class="p-2">NRR</th></tr>
+                            </thead>
+                            <tbody>
+                `;
+                tableData.forEach((row, index) => {
+                    const isQual = index < 2 ? "bg-blue-900/20 font-bold border-l-2 border-blue-500" : "";
+                    tableHTML += `
+                        <tr class="border-b border-slate-800 ${isQual}">
+                            <td class="p-2 flex items-center gap-2">
+                                <img src="${getFlagUrl(row.team)}" class="flag-img">
+                                <span>${row.team}</span>
+                            </td>
+                            <td class="p-2">${row.played}</td>
+                            <td class="p-2">${row.won}</td>
+                            <td class="p-2 text-blue-300 font-bold">${row.pts}</td>
+                            <td class="p-2 ${row.nrr >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${row.nrr}</td>
+                        </tr>
+                    `;
+                });
+                tableHTML += `</tbody></table></div>`;
+                tablesContainer.innerHTML += tableHTML;
+            }
+
+            for (let r = 1; r <= 5; r++) {
+                const roundMatches = tournamentData.groupMatches.filter(m => m.round === r);
+                let roundHTML = `
+                    <div class="card-bg p-4 rounded-xl">
+                        <h3 class="font-bold text-amber-400 mb-3 flex items-center gap-2">
+                            <span class="bg-amber-500/20 text-amber-300 px-2 py-1 rounded text-xs">ROUND ${r}</span>
+                            <span class="text-xs text-slate-400">(Har team ka Match # ${r})</span>
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                `;
+                roundMatches.forEach(m => {
+                    roundHTML += renderMatchCard(m, 'group');
+                });
+                roundHTML += `</div></div>`;
+                fixturesContainer.innerHTML += roundHTML;
+            }
+        }
+
+        function renderMatchCard(m, stage) {
+            let resultText = '<span class="text-slate-500 italic">Awaiting Result...</span>';
+            if (m.played) {
+                if (m.t1Score > m.t2Score) {
+                    resultText = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-trophy text-amber-400 me-1"></i>${m.team1} won</span>`;
+                } else if (m.t2Score > m.t1Score) {
+                    resultText = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-trophy text-amber-400 me-1"></i>${m.team2} won</span>`;
+                } else {
+                    resultText = `<span class="text-amber-400 font-bold">Match Tied</span>`;
+                }
+            }
+
+            return `
+                <div class="input-box p-3 rounded-lg space-y-2 border border-slate-700">
+                    <div class="flex justify-between items-center text-xs text-slate-400 border-b border-slate-800 pb-1">
+                        <span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-blue-400 font-bold">${m.group || 'Knockout'}</span>
+                        <span class="text-[10px] ${m.played ? 'text-emerald-400 font-bold' : 'text-slate-500'}">${m.played ? 'Completed' : 'Upcoming'}</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-200 font-medium">
+                        <span class="flex items-center gap-1.5"><img src="${getFlagUrl(m.team1)}" class="flag-img"> ${m.team1}</span>
+                        <span class="font-bold text-slate-500">VS</span>
+                        <span class="flex items-center gap-1.5">${m.team2} <img src="${getFlagUrl(m.team2)}" class="flag-img"></span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="flex gap-1">
+                            <input type="number" placeholder="Runs" value="${m.t1Score !== null ? m.t1Score : ''}" onchange="updateScore('${m.id}', '${stage}', 't1Score', this.value)" class="w-1/2 p-1 rounded input-box text-center">
+                            <input type="number" step="0.1" placeholder="Overs" value="${m.t1Overs !== null ? m.t1Overs : ''}" onchange="updateScore('${m.id}', '${stage}', 't1Overs', this.value)" class="w-1/2 p-1 rounded input-box text-center">
+                        </div>
+                        <div class="flex gap-1">
+                            <input type="number" placeholder="Runs" value="${m.t2Score !== null ? m.t2Score : ''}" onchange="updateScore('${m.id}', '${stage}', 't2Score', this.value)" class="w-1/2 p-1 rounded input-box text-center">
+                            <input type="number" step="0.1" placeholder="Overs" value="${m.t2Overs !== null ? m.t2Overs : ''}" onchange="updateScore('${m.id}', '${stage}', 't2Overs', this.value)" class="w-1/2 p-1 rounded input-box text-center">
+                        </div>
+                    </div>
+                    <div class="text-center text-[11px] pt-1 border-t border-slate-800/80">
+                        ${resultText}
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateScore(matchId, stage, field, val) {
+            let m;
+            if (stage === 'group') m = tournamentData.groupMatches.find(x => x.id === matchId);
+            else if (stage === 'super6') m = tournamentData.super6Matches.find(x => x.id === matchId);
+            else if (stage === 'sf1') m = tournamentData.sf1;
+            else if (stage === 'sf2') m = tournamentData.sf2;
+            else if (stage === 'final') m = tournamentData.finalMatch;
+
+            if (m) {
+                m[field] = val !== "" ? parseFloat(val) : null;
+                m.played = (m.t1Score !== null && m.t1Overs !== null && m.t2Score !== null && m.t2Overs !== null);
+                saveData();
+                renderApp();
+            }
+        }
+
+        function checkAndGenerateSuper6() {
+            let super6Teams = [];
+            for (const [groupName, teams] of Object.entries(INITIAL_GROUPS)) {
+                const groupMatches = tournamentData.groupMatches.filter(m => m.group === groupName);
+                const tableData = calculateTable(teams, groupMatches);
+                super6Teams.push(tableData[0].team, tableData[1].team);
+            }
+
+            const rounds = generateRoundRobinRounds(super6Teams);
+
+            if (tournamentData.super6Matches.length === 0) {
+                tournamentData.super6Matches = [];
+                rounds.forEach((rMatches, rIdx) => {
+                    rMatches.forEach((m, mIdx) => {
+                        tournamentData.super6Matches.push({
+                            id: `S6_R${rIdx+1}_${mIdx}`,
+                            round: rIdx + 1,
+                            group: "Super 6",
+                            team1: m.team1,
+                            team2: m.team2,
+                            t1Score: null, t1Overs: null, t2Score: null, t2Overs: null, played: false
+                        });
+                    });
+                });
+            } else {
+                let matchCounter = 0;
+                rounds.forEach((rMatches) => {
+                    rMatches.forEach((m) => {
+                        if (tournamentData.super6Matches[matchCounter]) {
+                            tournamentData.super6Matches[matchCounter].team1 = m.team1;
+                            tournamentData.super6Matches[matchCounter].team2 = m.team2;
+                        }
+                        matchCounter++;
+                    });
+                });
+            }
+        }
+
+        function renderSuper6() {
+            let s6Teams = [];
+            tournamentData.super6Matches.forEach(m => {
+                if(!s6Teams.includes(m.team1)) s6Teams.push(m.team1);
+                if(!s6Teams.includes(m.team2)) s6Teams.push(m.team2);
+            });
+
+            const tableData = calculateTable(s6Teams, tournamentData.super6Matches);
+            let tableHTML = `
+                <table class="w-full text-xs text-left">
+                    <thead class="text-slate-400 uppercase bg-slate-800/50">
+                        <tr><th class="p-2">Rank</th><th class="p-2">Team</th><th class="p-2">P</th><th class="p-2">W</th><th class="p-2">Pts</th><th class="p-2">NRR</th></tr>
+                    </thead>
+                    <tbody>
+            `;
+            tableData.forEach((row, idx) => {
+                const isQual = idx < 4 ? "bg-amber-900/20 font-bold border-l-2 border-amber-500" : "";
+                tableHTML += `
+                    <tr class="border-b border-slate-800 ${isQual}">
+                        <td class="p-2 text-slate-400">#${idx + 1}</td>
+                        <td class="p-2 flex items-center gap-2"><img src="${getFlagUrl(row.team)}" class="flag-img"> ${row.team}</td>
+                        <td class="p-2">${row.played}</td>
+                        <td class="p-2">${row.won}</td>
+                        <td class="p-2 text-amber-300 font-bold">${row.pts}</td>
+                        <td class="p-2 ${row.nrr >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${row.nrr}</td>
+                    </tr>
+                `;
+            });
+            tableHTML += `</tbody></table>`;
+            document.getElementById("super6-table-container").innerHTML = tableHTML;
+
+            const fixturesContainer = document.getElementById("super6-fixtures-container");
+            fixturesContainer.innerHTML = "";
+
+            for (let r = 1; r <= 5; r++) {
+                const roundMatches = tournamentData.super6Matches.filter(m => m.round === r);
+                if (roundMatches.length > 0) {
+                    let roundHTML = `
+                        <div class="card-bg p-4 rounded-xl">
+                            <h3 class="font-bold text-amber-400 mb-3 flex items-center gap-2">
+                                <span class="bg-amber-500/20 text-amber-300 px-2 py-1 rounded text-xs">ROUND ${r}</span>
+                                <span class="text-xs text-slate-400">(Super 6 Matches)</span>
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    `;
+                    roundMatches.forEach(m => {
+                        roundHTML += renderMatchCard(m, 'super6');
+                    });
+                    roundHTML += `</div></div>`;
+                    fixturesContainer.innerHTML += roundHTML;
+                }
+            }
+        }
+
+        function checkAndGenerateKnockouts() {
+            let s6Teams = [];
+            tournamentData.super6Matches.forEach(m => {
+                if(!s6Teams.includes(m.team1)) s6Teams.push(m.team1);
+                if(!s6Teams.includes(m.team2)) s6Teams.push(m.team2);
+            });
+            const top4 = calculateTable(s6Teams, tournamentData.super6Matches);
+
+            if (!tournamentData.sf1) tournamentData.sf1 = { id: "SF1", group: "Semi Final 1", team1: top4[0]?.team || "1st Place", team2: top4[3]?.team || "4th Place", t1Score: null, t1Overs: null, t2Score: null, t2Overs: null, played: false };
+            else { tournamentData.sf1.team1 = top4[0]?.team; tournamentData.sf1.team2 = top4[3]?.team; }
+
+            if (!tournamentData.sf2) tournamentData.sf2 = { id: "SF2", group: "Semi Final 2", team1: top4[1]?.team || "2nd Place", team2: top4[2]?.team || "3rd Place", t1Score: null, t1Overs: null, t2Score: null, t2Overs: null, played: false };
+            else { tournamentData.sf2.team1 = top4[1]?.team; tournamentData.sf2.team2 = top4[2]?.team; }
+
+            let sf1Winner = tournamentData.sf1.played ? (tournamentData.sf1.t1Score > tournamentData.sf1.t2Score ? tournamentData.sf1.team1 : tournamentData.sf1.team2) : "SF1 Winner";
+            let sf2Winner = tournamentData.sf2.played ? (tournamentData.sf2.t1Score > tournamentData.sf2.t2Score ? tournamentData.sf2.team1 : tournamentData.sf2.team2) : "SF2 Winner";
+
+            if (!tournamentData.finalMatch) tournamentData.finalMatch = { id: "FINAL", group: "FINAL", team1: sf1Winner, team2: sf2Winner, t1Score: null, t1Overs: null, t2Score: null, t2Overs: null, played: false };
+            else { tournamentData.finalMatch.team1 = sf1Winner; tournamentData.finalMatch.team2 = sf2Winner; }
+        }
+
+        function renderKnockouts() {
+            document.getElementById("sf1-match-container").innerHTML = renderMatchCard(tournamentData.sf1, 'sf1');
+            document.getElementById("sf2-match-container").innerHTML = renderMatchCard(tournamentData.sf2, 'sf2');
+            document.getElementById("final-match-container").innerHTML = renderMatchCard(tournamentData.finalMatch, 'final');
+        }
+
+        function switchTab(tab) {
+            document.getElementById("section-groups").classList.add("hidden");
+            document.getElementById("section-super6").classList.add("hidden");
+            document.getElementById("section-knockouts").classList.add("hidden");
+
+            document.getElementById("tab-groups").className = "py-3 px-6 text-slate-400 hover:text-slate-200 whitespace-nowrap";
+            document.getElementById("tab-super6").className = "py-3 px-6 text-slate-400 hover:text-slate-200 whitespace-nowrap";
+            document.getElementById("tab-knockouts").className = "py-3 px-6 text-slate-400 hover:text-slate-200 whitespace-nowrap";
+
+            document.getElementById(`section-${tab}`).classList.remove("hidden");
+            document.getElementById(`tab-${tab}`).className = "py-3 px-6 text-blue-400 border-b-2 border-blue-500 whitespace-nowrap font-bold";
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tournamentData));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `T20_World_Cup_Data.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importData(e) {
+            const fileReader = new FileReader();
+            fileReader.onload = function (event) {
+                tournamentData = JSON.parse(event.target.result);
+                saveData();
+                renderApp();
+            };
+            fileReader.readAsText(e.target.files[0]);
+        }
+
+        function resetTournament() {
+            if (confirm("Kya aap poora tournament data reset karna chahte hain?")) {
+                localStorage.removeItem("t20_wc_data_v3");
+                generateInitialFixtures();
+                tournamentData.super6Matches = [];
+                tournamentData.sf1 = null;
+                tournamentData.sf2 = null;
+                tournamentData.finalMatch = null;
+                saveData();
+                renderApp();
+            }
+        }
+
+        window.onload = async () => {
+            await initDB();
+            await loadData();
+            renderApp();
+        };
+    </script>
+</body>
+</html>
